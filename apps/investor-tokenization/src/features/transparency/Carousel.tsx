@@ -119,7 +119,7 @@ export const DummyContent = ({
               Current Balance
             </p>
             <p className="text-2xl font-bold text-neutral-900 dark:text-white">
-              {details.balance}
+              {formatCurrency(details.balance, details?.trustline?.symbol ?? "USDC")}
             </p>
           </div>
         )}
