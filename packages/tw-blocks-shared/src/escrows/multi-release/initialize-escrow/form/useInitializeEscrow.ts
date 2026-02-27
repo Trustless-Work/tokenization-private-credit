@@ -55,7 +55,7 @@ export function useInitializeEscrow() {
     (milestone) =>
       milestone.description === "" ||
       milestone.receiver === "" ||
-      milestone.amount === ""
+      milestone.amount === "",
   );
 
   const handleAddMilestone = () => {
@@ -124,7 +124,7 @@ export function useInitializeEscrow() {
       setIsSubmitting(true);
 
       const trustline = trustlines.find(
-        (tl) => tl.address === payload.trustline.address
+        (tl) => tl.address === payload.trustline.address,
       );
 
       if (!trustline) {
@@ -154,7 +154,7 @@ export function useInitializeEscrow() {
         })),
         trustline: {
           address: trustline?.address || "",
-          symbol: trustline?.name || "",
+          symbol: trustline?.symbol || "",
         },
       };
 

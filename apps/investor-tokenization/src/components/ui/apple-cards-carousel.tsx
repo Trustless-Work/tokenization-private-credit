@@ -209,15 +209,15 @@ export const Carousel = ({
                 Array.isArray(escrowIds) && isEscrowsLoading;
               const itemsToRender: ReactNode[] = isBulkLoading
                 ? Array.from({ length: Math.max(items.length, 3) }, () => (
-                    <div className="relative z-10 flex h-80 w-56 md:h-160 md:w-96 flex-col items-start justify-start overflow-hidden rounded-3xl bg-gray-100 dark:bg-neutral-900">
-                      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-full bg-linear-to-b from-black/40 via-transparent to-transparent" />
-                      <div className="relative z-40 p-8 w-full">
-                        <div className="h-6 w-2/3 rounded-md bg-white/70 animate-pulse mb-3" />
-                        <div className="h-4 w-full rounded-md bg-white/50 animate-pulse" />
-                      </div>
-                      <div className="absolute inset-0 z-10 bg-neutral-800/20 animate-pulse" />
+                  <div className="relative z-10 flex h-80 w-56 md:h-160 md:w-96 flex-col items-start justify-start overflow-hidden rounded-3xl bg-gray-100 dark:bg-neutral-900">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-full bg-linear-to-b from-black/40 via-transparent to-transparent" />
+                    <div className="relative z-40 p-8 w-full">
+                      <div className="h-6 w-2/3 rounded-md bg-white/70 animate-pulse mb-3" />
+                      <div className="h-4 w-full rounded-md bg-white/50 animate-pulse" />
                     </div>
-                  ))
+                    <div className="absolute inset-0 z-10 bg-neutral-800/20 animate-pulse" />
+                  </div>
+                ))
                 : items;
               return itemsToRender;
             })().map((item, index) => (
@@ -443,12 +443,12 @@ export const Card = ({
               <div className="py-10">
                 {React.isValidElement(card.content)
                   ? React.cloneElement(
-                      card.content as React.ReactElement<any>,
-                      {
-                        details: escrow,
-                        tokenFactory: card.tokenFactory,
-                      }
-                    )
+                    card.content as React.ReactElement<any>,
+                    {
+                      details: escrow,
+                      tokenFactory: card.tokenFactory,
+                    }
+                  )
                   : card.content}
               </div>
             </motion.div>

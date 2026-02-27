@@ -178,7 +178,7 @@ export const MilestoneDetailDialog = ({
               <span className="font-bold text-foreground">
                 {formatCurrency(
                   selectedMilestone.milestone.amount,
-                  selectedEscrow?.trustline?.name ?? "USDC"
+                  selectedEscrow?.trustline?.symbol ?? "USDC"
                 )}
               </span>
             </div>
@@ -268,7 +268,7 @@ export const MilestoneDetailDialog = ({
                     <p className="text-sm font-medium text-red-700 dark:text-red-300">
                       <span className="font-bold">Disputed by:</span>{" "}
                       {selectedMilestone.milestone.disputeStartedBy ===
-                      "serviceProvider"
+                        "serviceProvider"
                         ? "Service Provider"
                         : "Approver"}
                     </p>

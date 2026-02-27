@@ -1,7 +1,7 @@
 # Tokenize Escrow Flow - Current Architecture
 
 ## Overview
-This document maps the current tokenize escrow flow, identifying all components, file paths, and the sequence of operations.
+This document maps the current tokenize escrow flow, identifying all components, file paths, and the sequence of operations. It is aligned with the codebase as of the last update: deployment order is Token Sale first (with placeholder token), then Token Factory with immutable `mint_authority`, then Token Sale updated via `set_token`; the UI collects escrow ID, token name, and token symbol; the backoffice app exposes the primary deploy API.
 
 ## File Paths
 
@@ -13,7 +13,12 @@ This document maps the current tokenize escrow flow, identifying all components,
 - **Service**: `apps/backoffice-tokenization/src/features/tokens/services/token.service.ts`
 - **Success Dialog**: `apps/backoffice-tokenization/src/features/tokens/deploy/dialog/TokenizeEscrowSuccessDialog.tsx`
 
-### API Endpoint
+### API Endpoint (Backoffice – flujo principal)
+- **Route Handler**: `apps/backoffice-tokenization/src/app/api/deploy/route.ts`
+- **Deployment Service**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts`
+- **Soroban Client**: `apps/backoffice-tokenization/src/lib/sorobanClient.ts`
+
+### API Endpoint (Investor – equivalente)
 - **Route Handler**: `apps/investor-tokenization/src/app/api/deploy/route.ts`
 - **Deployment Service**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts`
 - **Soroban Client**: `apps/investor-tokenization/src/lib/sorobanClient.ts`
@@ -21,16 +26,18 @@ This document maps the current tokenize escrow flow, identifying all components,
 ### Smart Contracts
 - **Token Contract (Token Factory)**: `apps/smart-contracts/contracts/token-factory/src/contract.rs`
 - **Token Sale Contract**: `apps/smart-contracts/contracts/token-sale/src/sale.rs`
-- **Token Admin Module**: `apps/smart-contracts/contracts/token-factory/src/admin.rs`
-- **Token Metadata Module**: `apps/smart-contracts/contracts/token-factory/src/metadata.rs`
+- **Token Metadata Module**: `apps/smart-contracts/contracts/token-factory/src/metadata.rs` (standard metadata + immutable escrow_id and mint_authority)
 
 ## Form Fields
 
 ### TokenizeEscrow Dialog
-The UI form contains a single field:
+The UI form contains three fields (all required):
 - **escrowId** (string, required): The Escrow contract ID to tokenize
+- **tokenName** (string, required): Display name of the token (e.g. "Trustless Work Token")
+- **tokenSymbol** (string, required): Ticker/symbol, max 12 characters, uppercase letters and numbers only (e.g. "TRUST")
 
-**Location**: `apps/backoffice-tokenization/src/features/tokens/deploy/dialog/TokenizeEscrow.tsx` (lines 49-68)
+**Location**: `apps/backoffice-tokenization/src/features/tokens/deploy/dialog/TokenizeEscrow.tsx` (lines 49-128).  
+Form values are typed in `useTokenizeEscrow.ts` as `TokenizeEscrowFormValues` and sent to the API via `TokenService.deployToken({ escrowContractId, tokenName, tokenSymbol })`.
 
 ## Sequence Diagram
 
@@ -44,179 +51,175 @@ User (Browser)
     ├─> [2] User clicks "Tokenize Escrow" button
     │   └─> Opens TokenizeEscrowDialog
     │
-    ├─> [3] User enters Escrow ID and submits form
+    ├─> [3] User enters Escrow ID, Token Name, Token Symbol and submits form
     │   └─> useTokenizeEscrow.onSubmit()
-    │       └─> TokenService.deployToken(escrowId)
+    │       └─> TokenService.deployToken({ escrowContractId, tokenName, tokenSymbol })
     │
-    ├─> [4] HTTP POST to /api/deploy
-    │   └─> apps/investor-tokenization/src/app/api/deploy/route.ts
-    │       └─> deployTokenContracts(sorobanClient, { escrowContractId })
+    ├─> [4] HTTP POST to /api/deploy (baseURL from NEXT_PUBLIC_API_URL or "/api")
+    │   └─> apps/backoffice-tokenization/src/app/api/deploy/route.ts (when using backoffice UI)
+    │       └─> deployTokenContracts(sorobanClient, { escrowContractId, tokenName, tokenSymbol })
     │
-    ├─> [5] Deploy Token Contract (Token Factory)
+    ├─> [5] Upload WASM and deploy Token Sale first (placeholder token)
     │   └─> tokenDeploymentService.ts:deployTokenContracts()
-    │       ├─> Upload Token Factory WASM
-    │       ├─> Create Token Factory Contract
-    │       │   └─> Constructor Args:
-    │       │       ├─> admin: client.publicKey (deployer address)
-    │       │       ├─> decimal: 7
-    │       │       ├─> name: "TRUST"
-    │       │       └─> symbol: "TKN"
-    │       │   └─> contract.rs:__constructor()
-    │       │       ├─> write_administrator(&e, &admin)  [Sets deployer as admin]
-    │       │       └─> write_metadata(&e, TokenMetadata { decimal, name, symbol })
-    │
-    ├─> [6] Deploy Token Sale Contract
-    │   └─> tokenDeploymentService.ts:deployTokenContracts()
-    │       ├─> Upload Token Sale WASM
-    │       ├─> Create Token Sale Contract
+    │       ├─> Upload Token Factory WASM, then Token Sale WASM
+    │       ├─> Create Token Sale Contract (first, to get its address)
     │       │   └─> Constructor Args:
     │       │       ├─> escrow_contract: escrowContractId
-    │       │       └─> sale_token: tokenFactoryAddress
-    │       │   └─> sale.rs:__constructor()
-    │       │       └─> write_config(&env, &escrow_contract, &sale_token)
+    │       │       ├─> sale_token: client.publicKey (placeholder)
+    │       │       └─> admin: client.publicKey (deployer; can call set_token)
+    │       │   └─> sale.rs:__constructor() → write_config(), write_admin()
     │
-    ├─> [7] Transfer Mint Authority to Token Sale Contract
-    │   └─> tokenDeploymentService.ts:deployTokenContracts() (line 58-63)
-    │       └─> callContract(tokenFactoryAddress, "set_admin", [tokenSaleAddress])
-    │           └─> contract.rs:set_admin()
-    │               ├─> read_administrator(&e) [Gets current admin = deployer]
-    │               ├─> admin.require_auth() [Deployer must authorize]
-    │               └─> write_administrator(&e, &new_admin) [Sets Token Sale as admin]
+    ├─> [6] Deploy Token Factory with mint_authority = Token Sale
+    │   └─> tokenDeploymentService.ts:deployTokenContracts()
+    │       ├─> Create Token Factory Contract
+    │       │   └─> Constructor Args:
+    │       │       ├─> name: tokenName (user-provided)
+    │       │       ├─> symbol: tokenSymbol (user-provided)
+    │       │       ├─> escrow_id: escrowContractId (string)
+    │       │       ├─> decimal: 7
+    │       │       └─> mint_authority: tokenSaleAddress
+    │       │   └─> contract.rs:__constructor()
+    │       │       ├─> write_metadata(&e, TokenMetadata { decimal, name, symbol })
+    │       │       ├─> write_escrow_id(&e, &escrow_id)
+    │       │       └─> write_mint_authority(&e, &mint_authority)  [Immutable]
+    │
+    ├─> [7] Update Token Sale with real token address
+    │   └─> tokenDeploymentService.ts: callContract(tokenSaleAddress, "set_token", [tokenFactoryAddress])
+    │       └─> sale.rs:set_token()
+    │           ├─> read_admin(&env).require_auth()
+    │           └─> write token address in config (escrow unchanged)
     │
     └─> [8] Return deployment results
-        └─> Response: { tokenFactoryAddress, tokenSaleAddress }
-            └─> Display success dialog with contract addresses
+        └─> Response: { success, tokenFactoryAddress, tokenSaleAddress }
+            └─> TokenizeEscrowSuccessDialog with contract addresses
 ```
 
 ## Mint Authority Assignment
 
 ### Current Flow
-1. **Initial Assignment**: Token contract is created with deployer (`client.publicKey`) as admin
-   - **Location**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts` (line 36)
-   - **Contract**: `apps/smart-contracts/contracts/token-factory/src/contract.rs:__constructor()` (line 39)
-   - **Function**: `write_administrator(&e, &admin)` where `admin = client.publicKey`
+1. **Token Sale is deployed first** with a placeholder `sale_token` (deployer address) and `admin` (deployer). This yields `tokenSaleAddress` needed for the Token Factory constructor.
+   - **Location**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (Token Sale creation, lines 49-56)
+   - **Contract**: `apps/smart-contracts/contracts/token-sale/src/sale.rs:__constructor(env, escrow_contract, sale_token, admin)`
 
-2. **Transfer to Token Sale**: After Token Sale contract is deployed, mint authority is transferred
-   - **Location**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts` (lines 58-63)
-   - **Method**: `client.callContract(tokenFactoryAddress, "set_admin", [tokenSaleAddress])`
-   - **Contract**: `apps/smart-contracts/contracts/token-factory/src/contract.rs:set_admin()` (lines 63-73)
-   - **Authorization**: Current admin (deployer) must authorize the transfer
-   - **Result**: Token Sale contract becomes the mint authority
+2. **Token Factory is deployed with immutable mint_authority**: The Token Factory constructor receives `mint_authority: tokenSaleAddress` directly. There is no admin role and no `set_admin`; mint authority is set once at deployment and cannot be changed.
+   - **Location**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (Token Factory creation, lines 64-71)
+   - **Contract**: `apps/smart-contracts/contracts/token-factory/src/contract.rs:__constructor(e, name, symbol, escrow_id, decimal, mint_authority)`
+   - **Storage**: `write_mint_authority(&e, &mint_authority)` — immutable (panics if already set)
+
+3. **Token Sale is updated with the real token address** via `set_token(tokenFactoryAddress)` (admin-only), so the sale contract can call `mint` on the token.
+   - **Location**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (lines 77-82)
+   - **Contract**: `apps/smart-contracts/contracts/token-sale/src/sale.rs:set_token(env, new_token)`
 
 ### Key Code Locations
 
-**Mint Authority Transfer**:
+**Token Factory constructor (mint_authority set at deploy)**:
 ```typescript
-// apps/investor-tokenization/src/lib/tokenDeploymentService.ts:58-63
-await client.callContract(
-  tokenFactoryAddress,
-  "set_admin",
-  [client.nativeAddress(tokenSaleAddress)],
-  "TokenFactory set_admin",
-);
+// apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts (Token Factory createContract args)
+[
+  client.nativeString(tokenName),
+  client.nativeString(tokenSymbol),
+  client.nativeString(escrowContractId),
+  client.nativeU32(7),
+  client.nativeAddress(tokenSaleAddress), // mint_authority (Token Sale contract)
+]
 ```
 
-**Token Contract Admin Setter**:
+**Token contract: no set_admin; mint_authority immutable**:
 ```rust
-// apps/smart-contracts/contracts/token-factory/src/contract.rs:63-73
-pub fn set_admin(e: Env, new_admin: Address) {
-    let admin = read_administrator(&e);
-    admin.require_auth();
-    
-    e.storage()
-        .instance()
-        .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
-    
-    write_administrator(&e, &new_admin);
-    SetAdmin { admin, new_admin }.publish(&e);
-}
+// apps/smart-contracts/contracts/token-factory/src/contract.rs:__constructor()
+write_mint_authority(&e, &mint_authority);  // Set once; metadata.rs enforces immutability
+
+// apps/smart-contracts/contracts/token-factory/src/contract.rs:mint()
+let mint_authority = read_mint_authority(&e);
+mint_authority.require_auth();
 ```
 
-## Escrow ID Entry Point
+## Escrow ID and Metadata Entry Points
 
-### Where Escrow ID Enters the Flow
+### Where Escrow ID, Token Name, and Token Symbol Enter the Flow
 
-1. **User Input**: 
+1. **User Input**:
    - **Component**: `apps/backoffice-tokenization/src/features/tokens/deploy/dialog/TokenizeEscrow.tsx`
-   - **Field**: `escrowId` (line 51)
+   - **Fields**: `escrowId` (line 51), `tokenName` (line 73), `tokenSymbol` (line 94)
    - **Form Hook**: `useTokenizeEscrow` (line 27)
 
 2. **Service Call**:
    - **File**: `apps/backoffice-tokenization/src/features/tokens/deploy/dialog/useTokenizeEscrow.ts`
-   - **Line**: 35 - `tokenService.deployToken(values.escrowId)`
+   - **Line**: 37-41 - `tokenService.deployToken({ escrowContractId: values.escrowId, tokenName: values.tokenName, tokenSymbol: values.tokenSymbol })`
 
 3. **API Request**:
    - **File**: `apps/backoffice-tokenization/src/features/tokens/services/token.service.ts`
-   - **Line**: 20 - POST to `/deploy` with `{ escrowContractId }`
+   - **Line**: 31-35 - POST to `/deploy` with `{ escrowContractId, tokenName, tokenSymbol }`
 
 4. **API Handler**:
-   - **File**: `apps/investor-tokenization/src/app/api/deploy/route.ts`
-   - **Line**: 10 - Extracts `escrowContractId` from request body
-   - **Line**: 29-31 - Passes to `deployTokenContracts()`
+   - **File**: `apps/backoffice-tokenization/src/app/api/deploy/route.ts` (when backoffice UI is used)
+   - **Line**: 9-10 - Extracts `escrowContractId`, `tokenName`, `tokenSymbol` from request body
+   - **Line**: 55-60 - Passes to `deployTokenContracts(sorobanClient, { escrowContractId, tokenName, tokenSymbol })`
 
 5. **Deployment Service**:
-   - **File**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts`
-   - **Line**: 23 - Receives `{ escrowContractId }` as parameter
-   - **Line**: 52 - Used in Token Sale constructor: `client.nativeAddress(escrowContractId)`
+   - **File**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts`
+   - **Line**: 24 - Receives `{ escrowContractId, tokenName, tokenSymbol }` as parameter
+   - **Token Sale**: constructor receives `client.nativeAddress(escrowContractId)` (escrow_contract), placeholder sale_token, admin
+   - **Token Factory**: constructor receives `client.nativeString(tokenName)`, `client.nativeString(tokenSymbol)`, `client.nativeString(escrowContractId)` (escrow_id), decimal 7, and `client.nativeAddress(tokenSaleAddress)` (mint_authority)
 
 6. **Token Sale Contract**:
    - **File**: `apps/smart-contracts/contracts/token-sale/src/sale.rs`
-   - **Line**: 43 - Constructor receives `escrow_contract: Address`
-   - **Line**: 44 - Stores in config via `write_config(&env, &escrow_contract, &sale_token)`
-   - **Line**: 53 - Used in `buy()` function to transfer USDC to escrow
+   - **Constructor**: `__constructor(env, escrow_contract, sale_token, admin)` — stores escrow and token in config, admin for `set_token`
+   - **buy()**: Uses `read_config()` to get `escrow_contract` and transfers USDC to escrow
 
 ## Token Initialization Arguments
 
-### Token Factory Contract Constructor
-**Location**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts` (lines 33-42)
-
-```typescript
-const tokenFactoryAddress = await client.createContract(
-  tokenFactoryWasmHash,
-  [
-    client.nativeAddress(client.publicKey),  // admin: deployer address
-    StellarSDK.nativeToScVal(7, { type: "u32" }),  // decimal: 7
-    StellarSDK.nativeToScVal("TRUST", { type: "string" }),  // name: "TRUST"
-    StellarSDK.nativeToScVal("TKN", { type: "string" }),  // symbol: "TKN"
-  ],
-  "TokenFactory contract creation",
-);
-```
-
-**Contract Implementation**: `apps/smart-contracts/contracts/token-factory/src/contract.rs:__constructor()` (line 35)
-- Parameters: `admin: Address, decimal: u32, name: String, symbol: String`
-- Hardcoded values: decimal=7, name="TRUST", symbol="TKN"
-- Admin: Initially set to deployer, then transferred to Token Sale contract
-
-### Token Sale Contract Constructor
-**Location**: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts` (lines 49-56)
+### Token Sale Contract Constructor (deployed first)
+**Location**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (lines 49-56)
 
 ```typescript
 const tokenSaleAddress = await client.createContract(
   tokenSaleWasmHash,
   [
-    client.nativeAddress(escrowContractId),  // escrow_contract: Address
-    client.nativeAddress(tokenFactoryAddress),  // sale_token: Address
+    client.nativeAddress(escrowContractId),   // escrow_contract
+    client.nativeAddress(client.publicKey),   // sale_token (placeholder)
+    client.nativeAddress(client.publicKey),   // admin (deployer; can call set_token)
   ],
   "TokenSale contract creation",
 );
 ```
 
-**Contract Implementation**: `apps/smart-contracts/contracts/token-sale/src/sale.rs:__constructor()` (line 43)
-- Parameters: `escrow_contract: Address, sale_token: Address`
-- Stores both addresses in contract storage via `write_config()`
+**Contract Implementation**: `apps/smart-contracts/contracts/token-sale/src/sale.rs:__constructor(env, escrow_contract, sale_token, admin)` (line 55)
+- Parameters: `escrow_contract: Address, sale_token: Address, admin: Address`
+- Stores config via `write_config(&env, &escrow_contract, &sale_token)` and `write_admin(&env, &admin)`
 
-## Quick Reference: Mint Authority Location
+### Token Factory Contract Constructor (deployed second)
+**Location**: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (lines 64-71)
 
-**To locate mint authority assignment in <2 minutes:**
+```typescript
+const tokenFactoryAddress = await client.createContract(
+  tokenFactoryWasmHash,
+  [
+    client.nativeString(tokenName),           // name (user-provided)
+    client.nativeString(tokenSymbol),        // symbol (user-provided)
+    client.nativeString(escrowContractId),    // escrow_id
+    client.nativeU32(7),                     // decimal
+    client.nativeAddress(tokenSaleAddress),  // mint_authority (Token Sale contract)
+  ],
+  "TokenFactory contract creation",
+);
+```
 
-1. Open: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts`
-2. Go to line 58-63: This is where `set_admin` is called to transfer mint authority
-3. The contract implementation is at: `apps/smart-contracts/contracts/token-factory/src/contract.rs:set_admin()` (line 63)
+**Contract Implementation**: `apps/smart-contracts/contracts/token-factory/src/contract.rs:__constructor()` (line 36)
+- Parameters: `name: String, symbol: String, escrow_id: String, decimal: u32, mint_authority: Address`
+- Writes metadata (name, symbol, decimals), `escrow_id`, and `mint_authority`; all immutable after init
+
+## Quick Reference: Mint Authority and Deployment Order
+
+**To locate mint authority and deployment flow in <2 minutes:**
+
+1. Open: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts`
+2. **Order**: Token Sale is deployed first (lines 49-56) with placeholder token and admin; then Token Factory (lines 64-71) with `mint_authority: tokenSaleAddress`; then `set_token` (lines 77-82) to set the real token on Token Sale.
+3. Token contract: `apps/smart-contracts/contracts/token-factory/src/contract.rs` — no `set_admin`; `mint_authority` is set in `__constructor()` and in `metadata.rs` (immutable). `mint()` uses `read_mint_authority(&e).require_auth()`.
 
 **Summary**:
-- Initial admin: Set in token constructor (line 39 of contract.rs) to deployer address
-- Final admin: Transferred via `set_admin()` call (line 58-63 of tokenDeploymentService.ts) to Token Sale contract address
+- Mint authority: Set once in Token Factory constructor as `tokenSaleAddress`; immutable (no transfer step).
+- Token Sale: Gets real token address via `set_token(tokenFactoryAddress)` after Token Factory is deployed (deployer signs as admin).
 
 ---
 
@@ -276,22 +279,19 @@ All methods are implemented via `impl TokenInterface for Token` in `contract.rs`
 #### Custom Methods (Non-Interface)
 Implemented in `impl Token` block:
 
-11. **`__constructor(e: Env, admin: Address, decimal: u32, name: String, symbol: String)`** (line 35)
+11. **`__constructor(e: Env, name: String, symbol: String, escrow_id: String, decimal: u32, mint_authority: Address)`** (line 36)
     - Contract constructor
-    - Initializes admin and metadata
+    - Initializes metadata (name, symbol, decimals), immutable `escrow_id` and `mint_authority`
     - Required for contract deployment ✅
 
-12. **`mint(e: Env, to: Address, amount: i128)`** (line 50)
+12. **`mint(e: Env, to: Address, amount: i128)`** (line 66)
     - Mints new tokens
-    - Requires admin authorization
+    - Requires `mint_authority` authorization (read from storage; immutable)
     - Emits `MintWithAmountOnly` event
     - Standard pattern for mintable tokens ✅
 
-13. **`set_admin(e: Env, new_admin: Address)`** (line 63)
-    - Transfers admin/mint authority
-    - Requires current admin authorization
-    - Emits custom `SetAdmin` event
-    - **Required for architecture constraint** (Token Sale must have mint authority) ✅
+13. **`escrow_id(e: Env) -> String`** (line 205, additional `impl Token` block)
+    - Returns the immutable escrow contract ID associated with this token (T-REX-aligned metadata getter) ✅
 
 ### Comparison Table: Current Token vs Soroban Fungible Token Standard
 
@@ -307,9 +307,9 @@ Implemented in `impl Token` block:
 | `decimals` | ✅ | ✅ | **Keep** | Standard metadata getter |
 | `name` | ✅ | ✅ | **Keep** | Standard metadata getter |
 | `symbol` | ✅ | ✅ | **Keep** | Standard metadata getter |
-| `__constructor` | ✅ | ✅ | **Keep** | Required for deployment |
-| `mint` | ✅ | ✅ | **Keep** | Standard pattern for mintable tokens |
-| `set_admin` | ✅ | ⚠️ | **Keep** | Required for architecture (Token Sale mint authority) |
+| `__constructor` | ✅ | ✅ | **Keep** | Required for deployment (name, symbol, escrow_id, decimal, mint_authority) |
+| `mint` | ✅ | ✅ | **Keep** | Standard pattern; only mint_authority can mint |
+| `escrow_id` | ✅ | ✅ | **Keep** | T-REX-aligned immutable metadata getter |
 
 ### Metadata Analysis
 
@@ -320,12 +320,16 @@ Implemented in `impl Token` block:
 - **Storage Method**: `util.metadata().set_metadata(&metadata)` (line 21)
 - **Retrieval Method**: `util.metadata().get_metadata()` (lines 6, 11, 16)
 
-**Metadata Fields**:
+**Metadata Fields** (standard via TokenUtils):
 - `decimal: u32` - Token decimal places
 - `name: String` - Token name
 - `symbol: String` - Token symbol
 
-**Getters**: All three metadata fields are accessible via standard TokenInterface methods:
+**Immutable metadata** (instance storage, set once in constructor):
+- `escrow_id: String` - Escrow contract ID (see `metadata.rs`: `DataKey::EscrowId`, `read_escrow_id` / `write_escrow_id`)
+- `mint_authority: Address` - Only this address can call `mint` (see `metadata.rs`: `DataKey::MintAuthority`, `read_mint_authority` / `write_mint_authority`)
+
+**Getters**: Standard metadata via TokenInterface; `escrow_id()` in additional `impl Token` block:
 - `decimals()` → returns `u32`
 - `name()` → returns `String`
 - `symbol()` → returns `String`
@@ -337,26 +341,25 @@ Implemented in `impl Token` block:
 | `decimals()` | ✅ | ✅ | ✅ | ✅ |
 | `name()` | ✅ | ✅ | ✅ | ✅ |
 | `symbol()` | ✅ | ✅ | ✅ | ✅ |
+| `escrow_id()` | ✅ | ✅ | ✅ | ✅ (custom getter) |
 
-**Conclusion**: All required metadata getters are present and functional. Metadata is stored on-chain and readable via standard interface methods.
+**Conclusion**: All required metadata getters are present and functional. Metadata (including escrow_id and mint_authority) is stored on-chain; standard fields via TokenUtils, immutable fields in instance storage.
 
 ### Non-Standard Patterns Identified
 
-1. **`set_admin()` Custom Method**
-   - **Status**: Non-standard but **architecturally required**
-   - **Justification**: Token Sale contract must retain mint authority per master instructions
-   - **Action**: **Keep unchanged** - Required for architecture constraint
-   - **Location**: `contract.rs:63-73`
+1. **Immutable mint_authority (no set_admin)**
+   - **Status**: Mint authority is set once in the constructor and cannot be changed (enforced in `metadata.rs`: `write_mint_authority` panics if already set).
+   - **Justification**: Token Sale is the only minter; no admin transfer step. Architecture is deploy Token Sale first, then Token Factory with `mint_authority = tokenSaleAddress`.
+   - **Action**: **Keep unchanged** - Required for architecture and security.
 
-2. **Hardcoded Metadata Values**
-   - **Status**: Currently hardcoded in deployment service
-   - **Values**: `decimal=7`, `name="TRUST"`, `symbol="TKN"`
-   - **Location**: `tokenDeploymentService.ts:37-39`
-   - **Action**: **May need to change** - Should accept metadata as parameters (TBD in future tasks)
+2. **Parameterized Metadata (name, symbol)**
+   - **Status**: Token name and symbol are provided by the user in the UI and passed through the API to the deployment service and Token Factory constructor.
+   - **Location**: `TokenizeEscrow.tsx` (form), `token.service.ts`, `tokenDeploymentService.ts`, `contract.rs:__constructor(name, symbol, ...)`.
+   - **Action**: **Already implemented** - No longer hardcoded; decimal remains 7 in deployment.
 
-3. **Admin Initialization Pattern**
-   - **Status**: Standard pattern (admin set in constructor, then transferred)
-   - **Action**: **Keep unchanged** - Standard and secure pattern
+3. **Token Sale `set_token` (admin-only)**
+   - **Status**: Token Sale is deployed with a placeholder token address; after Token Factory is deployed, deployer (admin) calls `set_token(tokenFactoryAddress)` to set the real token. Escrow address is set at construction and not changed.
+   - **Action**: **Keep unchanged** - Required for deployment order (Token Sale first, then Token Factory).
 
 ### Things That MUST Remain Unchanged
 
@@ -366,14 +369,14 @@ Per master instructions, the following **MUST NOT** be modified:
    - File: `apps/smart-contracts/contracts/token-sale/src/sale.rs`
    - The `buy()` function and contract structure must remain unchanged
 
-2. **Mint Authority Assignment Flow** ❌ **DO NOT MODIFY**
-   - The pattern of: deployer → Token Sale contract
-   - File: `apps/investor-tokenization/src/lib/tokenDeploymentService.ts:58-63`
-   - Token Sale contract **MUST** retain mint authority
+2. **Mint Authority and Deployment Order** ❌ **DO NOT MODIFY**
+   - Token Sale deployed first with placeholder; Token Factory deployed with `mint_authority = tokenSaleAddress`; then `set_token` to set real token on Token Sale.
+   - File: `apps/backoffice-tokenization/src/lib/tokenDeploymentService.ts` (and equivalent in investor-tokenization)
+   - Token Sale contract **MUST** be the only mint_authority (immutable in Token Factory).
 
 3. **TokenInterface Implementation** ❌ **DO NOT MODIFY**
    - All standard interface methods must remain unchanged
-   - File: `apps/smart-contracts/contracts/token-factory/src/contract.rs:77-192`
+   - File: `apps/smart-contracts/contracts/token-factory/src/contract.rs` (impl TokenInterface and impl Token blocks)
    - This ensures compatibility with wallets and other Soroban tools
 
 4. **Existing Tokenize Escrow Flow** ❌ **DO NOT MODIFY**
@@ -405,32 +408,31 @@ This token contract is **already T-REX aligned** for the following reasons:
   - `name()` - returns `String`
   - `symbol()` - returns `String`
 - These getters are part of the standard `TokenInterface`
-- Currently used by: `apps/investor-tokenization/src/app/api/token-metadata/route.ts`
+- Consumed by: `apps/investor-tokenization/src/app/api/token-metadata/route.ts` (name, symbol, decimals)
 
 #### 4. **Metadata Initialization** ✅
 - Metadata is provided at initialization via constructor
-- Constructor parameters: `admin, decimal, name, symbol`
-- Metadata is written to on-chain storage immediately upon deployment
-- Location: `contract.rs:__constructor()` (lines 35-48)
+- Constructor parameters: `name, symbol, escrow_id, decimal, mint_authority`
+- Metadata (including escrow_id and mint_authority) is written to on-chain storage at deployment and is immutable
+- Location: `contract.rs:__constructor()` (lines 36-62)
 
 #### 5. **Architecture Compliance** ✅
-- Mint authority is correctly assigned to Token Sale contract
-- Token Sale contract retains exclusive mint authority (per master instructions)
-- No arbitrary admin minting is possible after deployment
-- The `set_admin()` method enables the required architecture pattern
+- Mint authority is set at deployment to the Token Sale contract address (immutable)
+- Token Sale contract is the only minter; no `set_admin` or transfer step
+- Deployment order: Token Sale first → Token Factory with mint_authority → Token Sale updated via `set_token`
 
 #### 6. **Soroban Best Practices** ✅
 - Uses standard Soroban SDK patterns
 - Proper TTL management for storage entries
 - Standard event emissions for all operations
-- Proper authorization checks (`require_auth()`)
+- Proper authorization checks (`require_auth()`); mint only by `mint_authority`
 
 #### 7. **T-REX Tokenization Requirements** ✅
 Based on Stellar T-REX tokenization standards:
 - ✅ Token implements standard fungible token interface
-- ✅ Metadata stored on-chain (not off-chain/IPFS)
-- ✅ Metadata readable via standard getters
-- ✅ Metadata provided at initialization
+- ✅ Metadata stored on-chain (name, symbol, decimals via TokenUtils; escrow_id and mint_authority in instance storage)
+- ✅ Metadata readable via standard getters plus `escrow_id()`
+- ✅ Metadata (and mint_authority) provided at initialization and immutable
 - ✅ Compatible with Stellar ecosystem tools
 - ✅ Follows Soroban contract conventions
 
@@ -440,16 +442,16 @@ While the token is T-REX aligned, potential enhancements (not requirements) coul
 
 1. **Additional Metadata Fields** (Optional)
    - Could add fields like `description`, `image_uri`, `documentation_uri`
-   - Would require extending `TokenMetadata` struct
+   - Would require extending metadata (TokenUtils and/or instance storage)
    - **Not required** for T-REX alignment
 
-2. **Metadata Parameterization** (Future Enhancement)
-   - Currently metadata is hardcoded in deployment service
-   - Could accept metadata as parameters from UI
-   - **Not required** for T-REX alignment, but would improve UX
+2. **Decimal Parameterization** (Optional)
+   - Currently decimal is fixed to 7 in the deployment service
+   - Could be made configurable from the UI like name and symbol
+   - **Not required** for T-REX alignment
 
 3. **Metadata Update Mechanism** (Not Recommended)
-   - Currently metadata is immutable after initialization
+   - Metadata (including escrow_id and mint_authority) is immutable after initialization
    - T-REX alignment doesn't require mutable metadata
    - **Keep immutable** for security and compliance
 

@@ -280,19 +280,19 @@ export const EscrowsBySignerCards = () => {
                             <span className="font-semibold">
                               {escrow.type === "single-release"
                                 ? formatCurrency(
-                                    escrow.amount,
-                                    escrow.trustline.name
-                                  )
+                                  escrow.amount,
+                                  escrow.trustline.symbol
+                                )
                                 : formatCurrency(
-                                    escrow.milestones.reduce(
-                                      (acc, milestone) =>
-                                        acc +
-                                        (milestone as MultiReleaseMilestone)
-                                          .amount,
-                                      0
-                                    ),
-                                    escrow.trustline.name
-                                  )}
+                                  escrow.milestones.reduce(
+                                    (acc, milestone) =>
+                                      acc +
+                                      (milestone as MultiReleaseMilestone)
+                                        .amount,
+                                    0
+                                  ),
+                                  escrow.trustline.symbol
+                                )}
                             </span>
                           </div>
 
@@ -304,7 +304,7 @@ export const EscrowsBySignerCards = () => {
                               <span className="font-medium text-green-800 dark:text-green-600">
                                 {formatCurrency(
                                   escrow.balance,
-                                  escrow.trustline.name
+                                  escrow.trustline.symbol
                                 )}
                               </span>
                             </div>
@@ -350,7 +350,7 @@ export const EscrowsBySignerCards = () => {
                                             <span className="text-muted-foreground">
                                               {formatCurrency(
                                                 milestone.amount,
-                                                escrow.trustline.name
+                                                escrow.trustline.symbol
                                               )}
                                             </span>
 
@@ -358,11 +358,10 @@ export const EscrowsBySignerCards = () => {
                                               <Tooltip>
                                                 <TooltipTrigger>
                                                   <span
-                                                    className={`bg-red-800 rounded-full h-2 w-2 ml-1 ${
-                                                      milestone.flags?.disputed
+                                                    className={`bg-red-800 rounded-full h-2 w-2 ml-1 ${milestone.flags?.disputed
                                                         ? "block"
                                                         : "hidden"
-                                                    }`}
+                                                      }`}
                                                   />
                                                 </TooltipTrigger>
                                                 <TooltipContent>
@@ -375,11 +374,10 @@ export const EscrowsBySignerCards = () => {
                                               <Tooltip>
                                                 <TooltipTrigger>
                                                   <span
-                                                    className={`bg-green-800 rounded-full h-2 w-2 ml-1 ${
-                                                      milestone.flags?.resolved
+                                                    className={`bg-green-800 rounded-full h-2 w-2 ml-1 ${milestone.flags?.resolved
                                                         ? "block"
                                                         : "hidden"
-                                                    }`}
+                                                      }`}
                                                   />
                                                 </TooltipTrigger>
                                                 <TooltipContent>
@@ -392,11 +390,10 @@ export const EscrowsBySignerCards = () => {
                                               <Tooltip>
                                                 <TooltipTrigger>
                                                   <span
-                                                    className={`bg-green-800 rounded-full h-2 w-2 ml-1 ${
-                                                      milestone.flags?.released
+                                                    className={`bg-green-800 rounded-full h-2 w-2 ml-1 ${milestone.flags?.released
                                                         ? "block"
                                                         : "hidden"
-                                                    }`}
+                                                      }`}
                                                   />
                                                 </TooltipTrigger>
                                                 <TooltipContent>
@@ -412,18 +409,17 @@ export const EscrowsBySignerCards = () => {
                                                 <Tooltip>
                                                   <TooltipTrigger>
                                                     <span
-                                                      className={`bg-yellow-600 rounded-full h-2 w-2 ml-1 ${
-                                                        milestone.flags
+                                                      className={`bg-yellow-600 rounded-full h-2 w-2 ml-1 ${milestone.flags
                                                           ?.approved &&
-                                                        !milestone.flags
-                                                          ?.disputed &&
-                                                        !milestone.flags
-                                                          ?.resolved &&
-                                                        !milestone.flags
-                                                          ?.released
+                                                          !milestone.flags
+                                                            ?.disputed &&
+                                                          !milestone.flags
+                                                            ?.resolved &&
+                                                          !milestone.flags
+                                                            ?.released
                                                           ? "block"
                                                           : "hidden"
-                                                      }`}
+                                                        }`}
                                                     />
                                                   </TooltipTrigger>
                                                   <TooltipContent>

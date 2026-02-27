@@ -19,13 +19,13 @@ export async function POST(request: Request) {
 
   try {
     const server = new StellarSDK.rpc.Server(RPC_URL);
-    
+
     // Try to get balance using contract function call first (works for Stellar Asset Contracts)
     // This is the preferred method as it works for both custom contracts and SAC
     try {
       const sourceAccount = await server.getAccount(address);
       const contract = new StellarSDK.Contract(tokenFactoryAddress);
-      
+
       const transaction = new StellarSDK.TransactionBuilder(sourceAccount, {
         fee: StellarSDK.BASE_FEE,
         networkPassphrase: StellarSDK.Networks.TESTNET,
@@ -35,23 +35,28 @@ export async function POST(request: Request) {
             "balance",
             StellarSDK.nativeToScVal(new StellarSDK.Address(address), {
               type: "address",
-            })
-          )
+            }),
+          ),
         )
         .setTimeout(30)
         .build();
 
       const simulation = await server.simulateTransaction(transaction);
-      
+
       // Check if simulation was successful and has results
-      if ('results' in simulation && Array.isArray(simulation.results) && simulation.results.length > 0) {
+      if (
+        "results" in simulation &&
+        Array.isArray(simulation.results) &&
+        simulation.results.length > 0
+      ) {
         const result = simulation.results[0];
-        if (result && 'retval' in result && result.retval) {
+        if (result && "retval" in result && result.retval) {
           const balanceVal = StellarSDK.scValToNative(result.retval);
-          const balance = typeof balanceVal === "bigint" 
-            ? Number(balanceVal) 
-            : Number(balanceVal);
-          
+          const balance =
+            typeof balanceVal === "bigint"
+              ? Number(balanceVal)
+              : Number(balanceVal);
+
           return NextResponse.json({
             success: true,
             balance: balance.toString(),
@@ -60,14 +65,17 @@ export async function POST(request: Request) {
       }
     } catch (functionCallError) {
       // If function call fails, fall back to reading from storage
-      console.log("Balance function call failed, trying storage read:", functionCallError);
+      console.log(
+        "Balance function call failed, trying storage read:",
+        functionCallError,
+      );
     }
-    
+
     // Fallback: Read balance directly from contract storage
     // The balance is stored in persistent storage with key DataKey::Balance(address)
     const contractAddress = StellarSDK.Address.fromString(tokenFactoryAddress);
     const userAddress = StellarSDK.Address.fromString(address);
-    
+
     // Create the storage key: DataKey::Balance(userAddress)
     // In Soroban, enum variants are encoded as vectors: [variant_index, ...data]
     // Balance is variant index 1 (0=Allowance, 1=Balance, 2=State, 3=Admin)
@@ -88,8 +96,13 @@ export async function POST(request: Request) {
 
     // Get the ledger entry
     const ledgerEntries = await server.getLedgerEntries(ledgerKey);
-    
-    if (!ledgerEntries || !ledgerEntries.entries || ledgerEntries.entries.length === 0) {
+
+    // !IMPORTANT: Not working
+    if (
+      !ledgerEntries ||
+      !ledgerEntries.entries ||
+      ledgerEntries.entries.length === 0
+    ) {
       // No balance entry found means balance is 0
       return NextResponse.json({
         success: true,
@@ -100,44 +113,52 @@ export async function POST(request: Request) {
     // Parse the storage entry to get the balance
     const entry = ledgerEntries.entries[0];
     if (!entry.val || !entry.val.contractData()) {
-      return NextResponse.json({
-        success: false,
-        balance: "0",
-        error: "Invalid contract data format",
-      }, { status: 200 });
+      return NextResponse.json(
+        {
+          success: false,
+          balance: "0",
+          error: "Invalid contract data format",
+        },
+        { status: 200 },
+      );
     }
 
     const contractData = entry.val.contractData();
     const storageValue = contractData.val();
-    
+
     // The value should be an i128 (the balance)
     // Parse it from ScVal
     let balance: number;
     try {
       const balanceVal = StellarSDK.scValToNative(storageValue);
-      balance = typeof balanceVal === "bigint" 
-        ? Number(balanceVal) 
-        : Number(balanceVal);
+      balance =
+        typeof balanceVal === "bigint"
+          ? Number(balanceVal)
+          : Number(balanceVal);
     } catch (parseError) {
-      return NextResponse.json({
-        success: false,
-        balance: "0",
-        error: `Failed to parse balance: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-      }, { status: 200 });
+      return NextResponse.json(
+        {
+          success: false,
+          balance: "0",
+          error: `Failed to parse balance: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        },
+        { status: 200 },
+      );
     }
-    
+
     return NextResponse.json({
       success: true,
       balance: balance.toString(),
     });
   } catch (error) {
     console.error("Token balance fetch error:", error);
-    return NextResponse.json({
-      success: false,
-      balance: "0",
-      error: error instanceof Error ? error.message : String(error),
-    }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: false,
+        balance: "0",
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { status: 200 },
+    );
   }
 }
-
-

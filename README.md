@@ -1,184 +1,71 @@
 # Tokenization Lego on Stellar + Trustless Work
 
-This repository is an **open-source template** showing how to build a full tokenization stack using:
-
-- **Stellar / Soroban**
-- **Trustless Work smart escrows**
-- **Participation tokens**
-- **Token sale contracts**
-- **Vault contracts for ROI**
-- **Next.js applications** for issuers, investors, and transparency
-
-It’s meant for **learning, experimentation, and real product prototypes**.
+**Open-source template** to build a tokenization stack with **Stellar/Soroban**, **Trustless Work** (escrows), participation tokens, token sales, ROI vaults, and **Next.js** apps for issuers, investors, and transparency.
 
 ---
 
-## 📦 Monorepo Structure
+## Monorepo structure
 
-```txt
-apps/
-  backoffice-tokenization        → Issuer console (escrows + tokenization flows)
-  investor-tokenization          → Investor portal (buy + claim ROI)
-  project-updates-tokenization   → Transparency portal (milestones + updates)
-  evidence-service               → Off-chain evidence microservice
-  smart-contracts                → Soroban contracts (escrow, token, sale, vault)
-````
-
----
-
-## 🚀 What This Template Demonstrates
-
-### 1. **Escrow Workflow (Trustless Work)**
-
-* Multi-release escrows
-* Milestone updates & approvals
-* Disputes & resolutions
-* Release of funds
-* Transparent role assignments
-
-All implemented via **Trustless Work React Blocks** and Soroban contracts.
+| App | Description |
+|-----|-------------|
+| `apps/backoffice-tokenization` | Issuer console: escrows, tokenization, milestones, disputes |
+| `apps/investor-tokenization` | Investor portal: buy tokens, holdings, claim ROI |
+| `apps/project-updates-tokenization` | Transparency portal: milestones and project status |
+| `apps/evidence-service` | Off-chain evidence microservice (IPFS) |
+| `apps/smart-contracts` | Soroban contracts: escrow, Token Factory, Token Sale, Vault |
 
 ---
 
-### 2. **Tokenization Engine**
+## What this template demonstrates
 
-A full lifecycle of a tokenized deal:
-
-1. **Deploy token contract** (Token Factory)
-2. **Create token sale** (primary issuance)
-3. **Route funds into escrow**
-4. **Execute milestones** via Trustless Work
-5. **Send returns to vault**
-6. **Investors claim ROI** based on token balance
-
-This mirrors **private credit**, **real-estate**, **crowdfunding**, and other RWA flows.
+1. **Escrow** — Multi-release, milestones, approvals, disputes, and fund release (Trustless Work + Soroban).
+2. **Tokenization** — Token deploy → primary sale → funds to escrow → milestones → returns to vault → investors claim ROI by balance.
+3. **Frontends** — Backoffice (manage), Investor (invest & claim), Project Updates (read-only).
 
 ---
 
-### 3. **Three Example Frontends**
+## Contracts (in `apps/smart-contracts`)
 
-#### **Backoffice (Issuer)**
+- **Escrow** — Multi-release, roles, disputes, approvals.
+- **Token Factory** — Mint/burn participation tokens.
+- **Token Sale** — Sell tokens for USDC and route to escrow.
+- **Vault** — Returns and ROI claim by token holdings.
 
-* Create & manage escrows
-* Deploy token + token sale + vault
-* Update milestones
-* Resolve disputes
-* Release funds
-
-#### **Investor Portal**
-
-* Join token sale
-* Check holdings
-* Claim ROI from the vault
-* View transparency indicators
-
-#### **Project Updates (Viewer)**
-
-* View milestone progress
-* See escrow transparency
-* Understand project lifecycle
+Includes tests and JSON snapshots.
 
 ---
 
-## 🧱 Smart Contracts Included
+## How to run
 
-All in `apps/smart-contracts`:
-
-* **Escrow contract**
-  Multi-release escrow with roles, disputes, approvals, releases.
-
-* **Token Factory**
-  Mint/burn participation tokens.
-
-* **Token Sale**
-  Sell tokens in exchange for USDC and route funds into escrow.
-
-* **Vault contract**
-  Hold returns and enable ROI claims based on token holdings.
-
-Each contract includes tests + JSON snapshots.
-
----
-
-## 🛠️ Running the Apps
+From the repo root (all apps):
 
 ```bash
-cd apps/<app-name>
 npm install
 npm run dev
 ```
 
-Apps run independently (different ports).
+Or a single app:
 
----
-
-## ⚙️ Environment Variables
-
-Each app has its own `.env.example` file with the required environment variables:
-
-- **`apps/investor-tokenization/.env.example`** - For the investor tokenization app
-- **`apps/backoffice-tokenization/.env.example`** - For the backoffice tokenization app
-- **`apps/evidence-service/.env.example`** - For the evidence service (IPFS/Pinata)
-- **`apps/project-updates-tokenization/.env.example`** - For the project updates app
-
-To set up each app:
-
-1. Copy the `.env.example` file to `.env.local` (or `.env`) in the app directory:
-   ```bash
-   cd apps/<app-name>
-   cp .env.example .env.local
-   ```
-
-2. Fill in the required values in `.env.local`
-
-**Common variables across apps:**
-- `NEXT_PUBLIC_SOROBAN_RPC_URL` - Soroban RPC endpoint
-- `NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE` - Stellar network passphrase
-- `NEXT_PUBLIC_ESCROW_CONTRACT_ID` - Deployed escrow contract address
-- `NEXT_PUBLIC_TOKEN_FACTORY_CONTRACT_ID` - Token factory contract address
-- `NEXT_PUBLIC_TOKEN_SALE_CONTRACT_ID` - Token sale contract address
-- `NEXT_PUBLIC_VAULT_CONTRACT_ID` - Vault contract address
-- `NEXT_PUBLIC_API_KEY` - Trustless Work API key
-- `NEXT_PUBLIC_TRUSTLESS_WORK_API_URL` - Trustless Work API URL
-
-**App-specific variables:**
-- **investor-tokenization**: `SOURCE_SECRET` (server-side, for contract deployment)
-- **evidence-service**: `PINATA_API_KEY`, `PINATA_SECRET_KEY` (for IPFS uploads)
-
----
-
-## 🧪 Local Development Notes
-
-* All apps use **Next.js (App Router)**
-* Styled with **Tailwind + ShadCN**
-* Wallet integration powered by Trustless Work Wallet Kit
-* Smart contract calls through Soroban RPC helpers
-* Escrow UI powered by Trustless Work Blocks
-
-This makes the repo a **plug-and-play playground** for RWA tokenization development.
-
----
-
-## 🌐 Intended Use
-
-This template is designed for:
-
-* Builders experimenting with tokenization
-* Teams learning how escrows + tokens + ROI work together
-* Hackathon projects
-* Platforms exploring RWA architecture
-* Developers integrating Trustless Work
-
-Fork it, modify it, and build your own tokenization product.
-
----
-
-## 📄 License
-
-MIT — use freely for education, prototypes, and commercial projects.
-
----
-
+```bash
+cd apps/<backoffice-tokenization|investor-tokenization|project-updates-tokenization|evidence-service>
+npm install
+npm run dev
 ```
 
+Each app has a `.env.example`; copy to `.env` or `.env.local` and fill in the variables (Soroban RPC, network, contract IDs, Trustless Work API, etc.).
+
 ---
+
+## Tech stack
+
+- **Next.js** (App Router), **Tailwind**, **ShadCN**
+- **Trustless Work**: Wallet Kit, Blocks (escrow UI), API
+- **Soroban** for contract calls
+
+---
+
+## Intended use
+
+For teams experimenting with tokenization, hackathons, RWA, or integrating Trustless Work. Fork, modify, and build your product.
+
+**License:** MIT.
