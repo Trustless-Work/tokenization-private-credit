@@ -15,6 +15,7 @@ export type VaultCardProps = {
   index: number;
 };
 
+//! IMPORTANT: Not working
 export default function VaultCard({ vault, index }: VaultCardProps) {
   const { vaultContractId, src } = vault;
   const { data, isLoading } = useVaultInfo(vaultContractId);
@@ -59,13 +60,6 @@ export default function VaultCard({ vault, index }: VaultCardProps) {
                 </div>
               </div>
             )}
-
-            <button
-              disabled={!data || data.claimableRoi <= 0}
-              className="mt-4 bg-black text-white px-4 py-2 rounded-md disabled:opacity-40"
-            >
-              Claim ROI
-            </button>
           </div>
         ),
       }}
