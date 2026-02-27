@@ -50,8 +50,7 @@ interface InvestDialogProps {
   triggerLabel?: string;
 }
 
-const DEFAULT_USDC_ADDRESS =
-  "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
+const DEFAULT_USDC_ADDRESS = process.env.NEXT_PUBLIC_DEFAULT_USDC_ADDRESS ?? "";
 
 export function InvestDialog({
   tokenSaleContractId,
@@ -92,26 +91,6 @@ export function InvestDialog({
     setSubmitting(true);
 
     try {
-      // Check USDC balance before attempting purchase
-      const investmentService = new InvestmentService();
-      const adjustedAmount = Math.floor(values.amount * 1_000_000); // Convert to microUSDC
-
-      const balanceResponse = await investmentService.getTokenBalance({
-        tokenFactoryAddress: DEFAULT_USDC_ADDRESS,
-        address: walletAddress,
-      });
-
-      const currentBalance = balanceResponse.success
-        ? parseFloat(balanceResponse.balance || "0")
-        : 0;
-
-      if (currentBalance < adjustedAmount) {
-        const balanceInUSDC = currentBalance / 1_000_000;
-        throw new Error(
-          `Insufficient USDC balance. You have ${balanceInUSDC.toFixed(2)} USDC but need ${values.amount.toFixed(2)} USDC. Please add more USDC to your wallet.`
-        );
-      }
-
       const tokenService = new TokenService();
 
       const payload: BuyTokenPayload = {
