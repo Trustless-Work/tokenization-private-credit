@@ -95,13 +95,13 @@ export function InvestDialog({
       // Check USDC balance before attempting purchase
       const investmentService = new InvestmentService();
       const adjustedAmount = Math.floor(values.amount * 1_000_000); // Convert to microUSDC
-      
+
       const balanceResponse = await investmentService.getTokenBalance({
         tokenFactoryAddress: DEFAULT_USDC_ADDRESS,
         address: walletAddress,
       });
 
-      const currentBalance = balanceResponse.success 
+      const currentBalance = balanceResponse.success
         ? parseFloat(balanceResponse.balance || "0")
         : 0;
 
@@ -170,7 +170,7 @@ export function InvestDialog({
         err instanceof Error
           ? err.message
           : "Unexpected error while processing your investment.";
-      
+
       // Check if error is due to insufficient USDC balance
       if (
         message.includes("resulting balance is not within the allowed range") ||
@@ -179,7 +179,7 @@ export function InvestDialog({
       ) {
         message = "Insufficient USDC balance. Please ensure your wallet has enough USDC to complete this transaction. You can get testnet USDC from a Stellar testnet faucet.";
       }
-      
+
       setErrorMessage(message);
     } finally {
       setSubmitting(false);
@@ -274,7 +274,7 @@ export function InvestDialog({
                 <BalanceProgressBar
                   contractId={selected.escrowId ?? ""}
                   target={totalAmount ?? 0}
-                  currency={selected.escrow?.trustline?.name ?? "USDC"}
+                  currency={selected.escrow?.trustline?.symbol ?? "USDC"}
                 />
 
                 {/* Metadata */}
@@ -325,7 +325,7 @@ export function InvestDialog({
                           {...field}
                           value={
                             Number.isNaN(field.value as number) ||
-                            field.value === ("" as unknown as number)
+                              field.value === ("" as unknown as number)
                               ? ""
                               : String(field.value)
                           }

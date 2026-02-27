@@ -37,9 +37,9 @@ export const InvestmentCard = ({
     ? milestones.reduce((acc, milestone) => acc + Number(milestone.amount), 0)
     : Number(escrow.amount || 0);
 
-  const currency = escrow.trustline?.name || "USDC";
+  const currency = escrow.trustline?.symbol || "USDC";
   const rawBalance = parseFloat(tokenBalance || "0");
-  
+
   // Format balance using token decimals (similar to Stellar Expert)
   const formattedBalance = rawBalance / Math.pow(10, tokenDecimals);
   const displaySymbol = tokenSymbol || "TOKEN";
@@ -66,19 +66,17 @@ export const InvestmentCard = ({
 
       <CardContent className="space-y-4">
         {/* Token Balance - Stellar Expert Style Display */}
-        <div className={`rounded-xl border-2 p-6 ${
-          formattedBalance > 0
+        <div className={`rounded-xl border-2 p-6 ${formattedBalance > 0
             ? "bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20"
             : "bg-muted border-border"
-        }`}>
+          }`}>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Wallet className={`w-5 h-5 ${formattedBalance > 0 ? "text-primary" : "text-muted-foreground"}`} />
                 <div>
-                  <p className={`text-sm font-medium uppercase tracking-wide ${
-                    formattedBalance > 0 ? "text-muted-foreground" : "text-muted-foreground"
-                  }`}>
+                  <p className={`text-sm font-medium uppercase tracking-wide ${formattedBalance > 0 ? "text-muted-foreground" : "text-muted-foreground"
+                    }`}>
                     {tokenName || "Token"} Balance
                   </p>
                   {tokenSymbol && (
@@ -100,9 +98,8 @@ export const InvestmentCard = ({
               )}
             </div>
             <div className="flex items-baseline gap-2">
-              <p className={`text-3xl font-bold ${
-                formattedBalance > 0 ? "text-foreground" : "text-muted-foreground"
-              }`}>
+              <p className={`text-3xl font-bold ${formattedBalance > 0 ? "text-foreground" : "text-muted-foreground"
+                }`}>
                 {formattedBalance.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: tokenDecimals,

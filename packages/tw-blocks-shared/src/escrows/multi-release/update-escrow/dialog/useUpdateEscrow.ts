@@ -31,7 +31,7 @@ export function useUpdateEscrow() {
 
   const isEscrowLocked = Number(selectedEscrow?.balance || 0) > 0;
   const initialMilestonesCountRef = React.useRef<number>(
-    ((selectedEscrow?.milestones as MultiReleaseMilestone[]) || []).length
+    ((selectedEscrow?.milestones as MultiReleaseMilestone[]) || []).length,
   );
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -142,7 +142,7 @@ export function useUpdateEscrow() {
 
   const handleMilestoneAmountChange = (
     index: number,
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     let rawValue = e.target.value;
     rawValue = rawValue.replace(/[^0-9.]/g, "");
@@ -186,7 +186,7 @@ export function useUpdateEscrow() {
       setIsSubmitting(true);
 
       const trustline = trustlines.find(
-        (tl) => tl.address === payload.trustline.address
+        (tl) => tl.address === payload.trustline.address,
       );
 
       if (!trustline) {
@@ -213,7 +213,7 @@ export function useUpdateEscrow() {
               : payload.platformFee,
           trustline: {
             address: payload.trustline.address,
-            symbol: selectedEscrow?.trustline?.name || "",
+            symbol: selectedEscrow?.trustline?.symbol || "",
           },
           roles: payload.roles,
           milestones: payload.milestones.map((milestone, index) => ({
@@ -248,13 +248,13 @@ export function useUpdateEscrow() {
         ...finalPayload.escrow,
         trustline: {
           name:
-            selectedEscrow.trustline?.name ||
+            selectedEscrow.trustline?.symbol ||
             (selectedEscrow.trustline?.address as string) ||
             "",
           address: finalPayload.escrow.trustline.address,
           symbol:
             selectedEscrow.trustline?.symbol ||
-            selectedEscrow.trustline?.name ||
+            selectedEscrow.trustline?.symbol ||
             "",
         },
       };
