@@ -5,14 +5,12 @@ use soroban_sdk::{contracttype, Address, String, Vec};
 pub struct Escrow {
     pub engagement_id: String,
     pub title: String,
-    pub roles: Roles,
     pub description: String,
-    pub amount: i128,
+    pub roles: Roles,
     pub platform_fee: u32,
     pub milestones: Vec<Milestone>,
-    pub flags: Flags,
     pub trustline: Trustline,
-    pub receiver_memo: i128,
+    pub receiver_memo: u32,
 }
 
 #[contracttype]
@@ -21,7 +19,17 @@ pub struct Milestone {
     pub description: String,
     pub status: String,
     pub evidence: String,
-    pub approved: bool,
+    pub amount: i128,
+    pub flags: Flags,
+    pub receiver: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MilestoneUpdate {
+    pub index: u32,
+    pub status: String,
+    pub evidence: Option<String>,
 }
 
 #[contracttype]
@@ -32,15 +40,15 @@ pub struct Roles {
     pub platform_address: Address,
     pub release_signer: Address,
     pub dispute_resolver: Address,
-    pub receiver: Address,
 }
 
 #[contracttype]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Flags {
     pub disputed: bool,
     pub released: bool,
     pub resolved: bool,
+    pub approved: bool,
 }
 
 #[contracttype]
@@ -61,5 +69,4 @@ pub struct AddressBalance {
 #[contracttype]
 pub enum DataKey {
     Escrow,
-    Admin,
 }

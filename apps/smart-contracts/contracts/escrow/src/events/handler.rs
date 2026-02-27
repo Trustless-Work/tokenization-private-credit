@@ -28,7 +28,6 @@ pub struct ChgEsc {
     pub new_escrow_properties: Escrow,
 }
 
-// Milestones
 #[contractevent(topics = ["tw_ms_change"], data_format = "vec")]
 #[derive(Clone)]
 pub struct MilestoneStatusChanged {
@@ -41,7 +40,6 @@ pub struct MilestoneApproved {
     pub escrow: Escrow,
 }
 
-// Disputes
 #[contractevent(topics = ["tw_disp_resolve"], data_format = "vec")]
 #[derive(Clone)]
 pub struct DisputeResolved {
@@ -54,7 +52,12 @@ pub struct EscrowDisputed {
     pub escrow: Escrow,
 }
 
-// Admin / TTL
+#[contractevent(topics = ["tw_withdraw"], data_format = "vec")]
+#[derive(Clone)]
+pub struct WithdrawEvt {
+    pub escrow: Escrow,
+}
+
 #[contractevent(topics = ["tw_ttl_extend"], data_format = "vec")]
 #[derive(Clone)]
 pub struct ExtTtlEvt {

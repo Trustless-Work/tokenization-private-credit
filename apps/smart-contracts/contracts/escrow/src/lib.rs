@@ -43,5 +43,4 @@ mod tests {
     mod test;
 }
 
-pub use crate::contract::{EscrowContract, EscrowContractClient};
-pub use crate::storage::types::{Escrow, Flags, Milestone, Roles, Trustline};
+pub use crate::contract::EscrowContract;
