@@ -15,7 +15,7 @@ export type VaultCardProps = {
   index: number;
 };
 
-//! IMPORTANT: Not working
+// ! IMPORTANT: Not working
 export default function VaultCard({ vault, index }: VaultCardProps) {
   const { vaultContractId, src } = vault;
   const { data, isLoading } = useVaultInfo(vaultContractId);
